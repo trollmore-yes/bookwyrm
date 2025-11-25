@@ -1,21 +1,6 @@
 from resource_manager import ResourceManager
 from datetime import datetime
 
-MONTH_CODES = {
-            1 : "Jan",
-            2 : "Feb",
-            3 : "Mar",
-            4 : "Apr",
-            5 : "May",
-            6 : "Jun",
-            7 : "Jul",
-            8 : "Aug",
-            9 : "Sep",
-            10 : "Oct",
-            11 : "Nov",
-            12: "Dec"
-        }
-
 class ChannelManager():
     def __init__(self, rm : ResourceManager):
         self.discussion_forum = None
@@ -48,7 +33,7 @@ class ChannelManager():
         month = now.month
         year = now.year
 
-        thread_name = f"{name} Discussion {MONTH_CODES[month]} {year}"
+        thread_name = f"{name} Discussion {month}/{year}"
 
         return await self.discussion_forum.create_thread(name=thread_name, content=forum_header, files=[mascot, feedback_guide])
 
@@ -57,7 +42,7 @@ class ChannelManager():
         now = datetime.now()
         month = now.month
         year = now.year
-        thread_name = f"{name} Submissions {MONTH_CODES[month]} {year}"
+        thread_name = f"{name} Submissions {month}/{year}"
         return await self.submission_forum.create_thread(name=thread_name, content=self.rm.get_sub_header(), file=mascot)
 
     async def build_group_threads(self, name="HippoHammer"):
