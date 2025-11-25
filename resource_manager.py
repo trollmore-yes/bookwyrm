@@ -12,7 +12,7 @@ class ResourceManager():
             raise ValueError(f"Inappropriate resource request '{name}'")
 
         if Path(f'./resources/{name.lower()}.png').exists():
-            with open(f'resources/{name.lower()}.png', 'rb') as f:
+            with open(f'resources/mascots/{name.lower()}.png', 'rb') as f:
                 return discord.File(f)
         else: 
             raise ValueError(f"could not find mascot image '{name}'")
