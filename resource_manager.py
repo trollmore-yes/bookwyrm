@@ -1,3 +1,5 @@
+import discord
+
 class ResourceManager():
     def __init__(self):
         self.forum_header = "forum_header.txt"
@@ -8,17 +10,19 @@ class ResourceManager():
             "Aardvarktillery" : "Aardvarktillery_Kerry.png",
             "Axelotl" : "Axelotl_Kerry.png",
             "BadgerPunch" : "BadgerPunch_Kerry.png",
+            "BunnyBomb" : "BunnyBomb_Kerry.png",
             "FalchionFish" : "FalchionFish_Kerry.png",
             "FoxSpear" : "FoxSpear_Kerry.png",
-            "GrenadeFly" : "Gadfly_Grenade.png",
+            "GatlingGoose" : "GatlingGoose_Kerry.png",
+            "GrenadeFly" : "Gadfly_Grenade_Kerry.png",
             "GlockCroc" : "GlockCroc_Kerry.png",
             "GunMouse" : "GunMouse_Kerry.png",
             "HippoHammer" : "HippoHammer_Kerry.png",
             "Newtclear" : "Newtclear_Kerry.png",
             "ScytheSnake" : "ScytheSnake_Kerry.png",
-            "Shuriken_Shark" : "ShurikenShark_Kerry.png",
+            "ShurikenShark" : "ShurikenShark_Kerry.png",
             "TadPolearm" : "TadPolearm_Kerry.png",
-            "WarTurtle" : "WarTurtle_Kerry.png"
+            "WarTurtle" : "Warturtle_Kerry.png"
         }
 
 
@@ -26,7 +30,7 @@ class ResourceManager():
         with open(f'resources/{self.mascot_images[name]}', 'rb') as f:
             return discord.File(f)
 
-    def get_feedback_graphic(self, name):
+    def get_feedback_graphic(self):
         with open(f'resources/{self.feedback_guide}', 'rb') as f:
             return discord.File(f)
 
