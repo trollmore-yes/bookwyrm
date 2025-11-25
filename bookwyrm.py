@@ -32,7 +32,8 @@ async def build_group(ctx, name):
             await cm.build_group_threads(name=n)
         await ctx.respond(f"built {len(names)} groups")
     else:
-        await cm.build_group_threads(name=name)
+        disc, sub = await cm.build_group_threads(name=name)
+        
         await ctx.respond(f"built groups for {name}")
 
 bot.run(os.getenv('TOKEN'))

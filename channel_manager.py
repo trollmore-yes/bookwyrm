@@ -25,9 +25,12 @@ class ChannelManager():
 
     async def build_submission_thread(self, name="HippoHammer"):
         mascot = self.rm.get_mascot(name)
-        return await self.submission_forum.create_thread(name=name, content=self.rm.get_sub_header(), files=[mascot])
+        return await self.submission_forum.create_thread(name=name, content=self.rm.get_sub_header(), file=mascot)
 
     async def build_group_threads(self, name="HippoHammer"):
-        sub_thread = await self.build_submission_thread(name=name)
-        disc_thread = await self.build_discussion_thread(name=name, sub_thread=sub_thread)
-        return disc_thread
+        try:
+            sub_thread = await self.build_submission_thread(name=name)
+            disc_thread = await self.build_discussion_thread(name=name, sub_thread=sub_thread)
+            return disc_thread, sub_thread
+        except ValueError:
+            print(f"could not find mascot image for '{name}")
