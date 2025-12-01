@@ -79,6 +79,7 @@ QUESTION_CODES = {
     'Is there anyone you would prefer NOT to work with?  (This question only ensures you are not matched together. If you want to report a problem, use the next question.  For best results, please only list their names, separated by commas.)' : 'match_veto',
     'Did you have any problem members this month? (e.g., no-shows, refused to give feedback, or overly abrasive/negative feedback.) Please list all members who apply so we can investigate.' : 'naughty_list',
     'Is there anyone you want to be matched with?  (For best results, please only list their names, separated by commas.)' : 'match_request',
+    'True or False: In critique groups, you should tell your other group members what they messed up and how to fix it. (This question is mandatory, and you must get it correct.)' : 'quiz'
 }
 
 GROUP_NAMES = [
@@ -923,8 +924,8 @@ for response in input:
     # chapter links
     chapters = [response[columns['wk_1']], 
                 response[columns['wk_2']], 
-                response[columns['wk_3']],
-                response[columns['wk_4']]]
+                response[columns['wk_3']]]#,
+#                response[columns['wk_4']]]
 
     # what size group are you okay with?
     size_pref = [SIZE_CODE[pref] for pref in response[columns['size_pref']].split(", ")]

@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 from channel_manager import ChannelManager
 from resource_manager import ResourceManager
 
+ALLOWED_GUILDS = [1274792500975894589, 687838172348284995]
+
+
 load_dotenv()
 bot = discord.Bot()
 
@@ -17,14 +20,14 @@ async def on_ready():
 # async def hello(ctx):
 #     await ctx.respond("Hello!")
 
-@bot.slash_command(guild_ids=[1274792500975894589])
+@bot.slash_command(guild_ids=ALLOWED_GUILDS)
 async def set_forum_ids(ctx, disc_forum : discord.ForumChannel, sub_forum : discord.ForumChannel):
     cm.set_channels(disc=disc_forum, sub=sub_forum)
     cm.guild_id = ctx.guild.id
     print(f"guild_id = {cm.guild_id}")
     await ctx.respond(f"we are in: **{str(ctx.guild).upper()}**\nset discussion forum to **{disc_forum}** \nset submission forum to **{sub_forum}**")
 
-@bot.slash_command(guild_ids=[1274792500975894589])
+@bot.slash_command(guild_ids=ALLOWED_GUILDS)
 async def build_group(ctx, name):
 
     await ctx.respond(f"Building `{name}`...")
