@@ -53,7 +53,8 @@ class ChannelManager():
 
         now = datetime.now()
         month = now.month
-        year = now.year
+        year = f"{now.year}"[2:]
+
 
         thread_name = f"{name} Discussion {month}/{year}"
 
@@ -70,7 +71,7 @@ class ChannelManager():
         mascot = self.rm.get_mascot(name)
         now = datetime.now()
         month = now.month
-        year = now.year
+        year = f"{now.year}"[2:]
         thread_name = f"{name} Submissions {month}/{year}"
         return await self.submission_forum.create_thread(name=thread_name, content=self.rm.get_sub_header(), file=mascot)
 

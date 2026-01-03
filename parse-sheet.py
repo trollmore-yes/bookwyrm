@@ -796,6 +796,17 @@ class Auditor:
     def __init__(self, model):
         self.model : Model = model
 
+    def check_submissions(self):
+        print("AUDITING USER SUBMISSIONS")
+        output = ""
+
+        sorted_users = sorted(self.model.users, key=lambda x: x.name)
+        for idx in range(len(sorted_users)-1):
+            if sorted_users[idx].name == sorted_users[idx+1].name:
+                output += f"  Repeated submission: {sorted_users[idx].name}\n"
+
+        print(output if output else "  no issues found\n\n")
+
     def check_groups(self):
         print("AUDITING GROUP REQUIREMENTS")
         for g in self.model.groups:
@@ -924,8 +935,8 @@ for response in input:
     # chapter links
     chapters = [response[columns['wk_1']], 
                 response[columns['wk_2']], 
-                response[columns['wk_3']]]#,
-#                response[columns['wk_4']]]
+                response[columns['wk_3']],
+                response[columns['wk_4']]]
 
     # what size group are you okay with?
     size_pref = [SIZE_CODE[pref] for pref in response[columns['size_pref']].split(", ")]
@@ -1004,6 +1015,7 @@ print(v.group_info( summary=False,
                     cw=True,
                     prev=True))
 
+a.check_submissions()
 a.check_groups()
 
 print()
