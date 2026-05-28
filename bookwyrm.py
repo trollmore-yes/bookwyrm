@@ -2,7 +2,6 @@ import discord
 import os
 from dotenv import load_dotenv
 from channel_manager import ChannelManager
-from resource_manager import ResourceManager
 
 ALLOWED_GUILDS = [1274792500975894589, 687838172348284995]
 
@@ -10,7 +9,7 @@ ALLOWED_GUILDS = [1274792500975894589, 687838172348284995]
 load_dotenv()
 bot = discord.Bot()
 
-cm = ChannelManager(ResourceManager())
+cm = ChannelManager()
 
 @bot.event
 async def on_ready():

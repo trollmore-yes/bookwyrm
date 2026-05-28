@@ -1,12 +1,11 @@
-from resource_manager import ResourceManager
+from resources import get_mascot, get_feedback_graphic, get_forum_header, get_sub_header
 from datetime import datetime
 
 class ChannelManager():
-    def __init__(self, rm : ResourceManager):
+    def __init__(self):
         self.discussion_forum = None
         self.submission_forum = None
         self.guild_id = None
-        self.rm = rm
 
     def set_channels(self, disc, sub):
         """
@@ -45,9 +44,9 @@ class ChannelManager():
         """
         assert self.discussion_forum is not None
 
-        mascot = self.rm.get_mascot(name)
-        feedback_guide = self.rm.get_feedback_graphic()
-        forum_header = self.rm.get_forum_header()
+        mascot = get_mascot(name)
+        feedback_guide = get_feedback_graphic()
+        forum_header = get_forum_header()
 
         if sub_thread:
             forum_header += "\n\nYour submission thread is here:"
@@ -72,12 +71,12 @@ class ChannelManager():
         """
         assert self.submission_forum is not None
 
-        mascot = self.rm.get_mascot(name)
+        mascot = get_mascot(name)
         now = datetime.now()
         month = now.month
         year = f"{now.year}"[2:]
         thread_name = f"{name} Submissions {month}/{year}"
-        return await self.submission_forum.create_thread(name=thread_name, content=self.rm.get_sub_header(), file=mascot)
+        return await self.submission_forum.create_thread(name=thread_name, content=get_sub_header(), files=[mascot])
 
     async def build_group_threads(self, name="HippoHammer") -> tuple[str, str]:
         """
