@@ -967,7 +967,10 @@ for response in input:
     match_veto = response[columns['match_veto']]
 
     # where you in groups last month? if so, stay with them?
-    prev_month = GROUP_SORT_MODES[response[columns['prev_month']]]
+    try:
+        prev_month = GROUP_SORT_MODES[response[columns['prev_month']]]
+    except:
+        print(f"error 'prev_month' for user {name}")
 
     # which group last month?
     prev_group = response[columns['prev_group']].replace(" ","").lower()
