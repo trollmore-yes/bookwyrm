@@ -106,6 +106,7 @@ GROUPS = { name.lower() : [] for name in GROUP_NAMES}
 # used for fuzzy matching on name fields for team requests and vetos
 # values below 80 don't seem to work very well; max 99
 NAME_TOLERANCE = 90
+GROUP_TOLERANCE = 80
 
 def extend_str(input, length):
     """
@@ -282,7 +283,7 @@ class Group:
         self.members = self.members + other.members.copy()
         return self
     
-    def steal_least_compatible_member_from(self, other, virtual=False) -> tuple[int, float] | None:
+    def steal_least_compatible_member_from(self, other, virtual=False) -> tuple[int, float] | tuple[None, int]:
         """
         Checks all possibilities where one group member is transfered from another group,
         then makes the transfer that best increases overall fit if one exists.
@@ -597,7 +598,7 @@ class Model:
             while req_names:
                 tmp_name = req_names.pop(0)
                 if tmp_name in reserved_names:
-                    self.reserved_names.remove(tmp_name)
+                    self.available_names.remove(tmp_name)
                     g.name = tmp_name
                     break
             if not g.name:
@@ -641,7 +642,7 @@ class Model:
             if best_origin:
                 dest_group.steal_least_compatible_member_from(best_origin)
 
-    def get_local_group_minima(self, g_idx) -> tuple[Group, Group, Group]:
+    def get_local_group_minima(self, g_idx) -> None:
         g1, g2, g3 = self.groups[g_idx-1:g_idx+2]
         
         tmp1_1, tmp1_2, _ = self.osmose_groups(g1, g2)
@@ -796,28 +797,32 @@ class Auditor:
     def __init__(self, model):
         self.model : Model = model
 
-    def check_submissions(self):
-        print("AUDITING USER SUBMISSIONS")
-        output = ""
+    def check_submissions(self) -> str:
+        output = "AUDITING USER SUBMISSIONS\n"
+        submission_errors = ""
 
         sorted_users = sorted(self.model.users, key=lambda x: x.name)
         for idx in range(len(sorted_users)-1):
             if sorted_users[idx].name == sorted_users[idx+1].name:
-                output += f"  Repeated submission: {sorted_users[idx].name}\n"
+                submission_errors += f"  Repeated submission: {sorted_users[idx].name}\n"
 
-        print(output if output else "  no issues found\n\n")
+        output += submission_errors if submission_errors else "  no issues found\n\n"
+        return output
 
-    def check_groups(self):
-        print("AUDITING GROUP REQUIREMENTS")
+    def check_groups(self) -> str:
+        output = "AUDITING GROUP REQUIREMENTS\n"
+        
         for g in self.model.groups:
-            print(f"{g.name}:")
-            output = ""
-            output += self.check_group_size(g)
-            output += self.check_read_write_parity(g)
-            output += self.check_cw_collision(g)
-            output += self.check_group_assignments(g)
+            output += f"{g.name}:\n"
+            group_errors = ""
+            group_errors += self.check_group_size(g)
+            group_errors += self.check_read_write_parity(g)
+            group_errors += self.check_cw_collision(g)
+            group_errors += self.check_group_assignments(g)
 
-            print(output if output else "  no issues found\n", end="")
+            output += group_errors if group_errors else "  no issues found\n"
+
+        return output
 
     def check_group_size(self, group:Group):
         output = ""
@@ -892,6 +897,7 @@ def clean_team_reqs(users) -> None:
         match_veto = p.match_veto
         if match_veto:
             p.match_veto = [name for name in name_list if fuzz.partial_ratio(name, match_veto) > NAME_TOLERANCE]
+
 
 
 #######################################################
@@ -975,6 +981,7 @@ for response in input:
     # which group last month?
     prev_group = response[columns['prev_group']].replace(" ","").lower()
 
+
     # # do you want to be in a contest-focused group?
     # contest = response[-1] == "Yes"k
 
@@ -1012,20 +1019,19 @@ m.make_groups(premades=reqs)
 v = Visualizer(m)
 a = Auditor(m)
 
-print(v.model_info(), "\n")
-print(v.group_info( summary=False, 
-                    wc=True,
-                    cw=True,
-                    prev=True))
+with open("groups-26-06.txt", "w", encoding="utf-8") as f:
+    f.write(v.model_info() + "\n\n")
+    f.write(v.group_info( summary=False, 
+                            wc=True,
+                            cw=True,
+                            prev=True))
 
-a.check_submissions()
-a.check_groups()
+    f.write(a.check_submissions())
+    f.write(a.check_groups())
 
-print()
-print("PROBLEM MEMBER REPORTS:")
-print("\n".join(f'{name}: "{txt}"' for name, txt in naughty_list if txt))
-print("----")
-
-print("\n", v.print_formatted_group_list())
+    f.write("\nPROBLEM MEMBER REPORTS:\n")
+    f.write("\n".join(f'{name}: "{txt}"' for name, txt in naughty_list if txt))
+    f.write("----\n")
+    f.write(v.print_formatted_group_list())
 
 
