@@ -1,8 +1,11 @@
-from fuzzywuzzy import fuzz
-from functools import reduce
+import argparse
 import csv
-from random import shuffle, seed
 from datetime import datetime
+from functools import reduce
+from pathlib import Path
+from random import seed, shuffle
+
+from fuzzywuzzy import fuzz
 
 WORDCOUNT_CODE = {
     "Up to 2,000": 0,
@@ -904,134 +907,152 @@ def clean_team_reqs(users) -> None:
 #                   begin script                      #
 #######################################################
 
-users = []
+def main(input_path="source.csv", output_path=None):
+    users = []
 
-with open("source.csv", "r", encoding="utf-8") as f:
-    # input = "\r".join([line for line in file])
-    data = list(csv.reader(f))
+    input_path = Path(input_path)
+    if output_path is None:
+        output_path = Path(f"groups-{datetime.now().strftime('%y-%m')}.txt")
+    else:
+        output_path = Path(output_path)
 
-    header = [question.replace("\n","") for question in data[0]]
-    input = data[1:]
+    with input_path.open("r", encoding="utf-8") as f:
+        # input = "\r".join([line for line in file])
+        data = list(csv.reader(f))
+
+        header = [question.replace("\n","") for question in data[0]]
+        input = data[1:]
 
 
-columns = { QUESTION_CODES[question]: idx 
-           for (idx, question) in zip(range(len(header)), header) }
+    columns = { QUESTION_CODES[question]: idx 
+               for (idx, question) in zip(range(len(header)), header) }
 
-naughty_list = []
+    naughty_list = []
 
-for response in input:
+    for response in input:
 
-    quiz = response[columns['quiz']]
-    if quiz == "TRUE":
-        continue
+        quiz = response[columns['quiz']]
+        if quiz == "TRUE":
+            continue
 
-    name = response[columns['name']]
+        name = response[columns['name']]
 
-    # how much output will you bring?
-    words_wr = WORDCOUNT_CODE[response[columns['words_wr']]]
+        # how much output will you bring?
+        words_wr = WORDCOUNT_CODE[response[columns['words_wr']]]
 
-    # what genre do you write?
-    genre_wr = response[columns['genre_wr']].split("& ")
+        # what genre do you write?
+        genre_wr = response[columns['genre_wr']].split("& ")
 
-    # what content warnings apply to your story?
-    cw_wr = [
-        GENRE_CODE[cw] if cw in GENRE_CODE else cw for cw in response[columns['cw_wr']].split("& ")
-    ]
-
-    # chapter links
-    chapters = [response[columns['wk_1']], 
-                response[columns['wk_2']], 
-                response[columns['wk_3']],
-                response[columns['wk_4']]]
-
-    # what size group are you okay with?
-    size_pref = [SIZE_CODE[pref] for pref in response[columns['size_pref']].split(", ")]
-
-    # how many words can you commit to critiquing each week?
-    words_r = WORDCOUNT_CODE[response[columns['words_r']]]
-
-    # what genres will you be bringing to group?
-    genre_r = [
-        GENRE_CODE[genre] if genre in GENRE_CODE else genre
-        for genre in response[columns['genre_r']].split("& ")
-    ]
-
-    # which content warnings do you want to avoid?
-    cw_veto = (
-        []
-        if response[columns['cw_veto']] == "I'll read anything!"
-        else [
-            GENRE_CODE[cw] if cw in GENRE_CODE else cw
-            for cw in response[columns['cw_veto']].split("& ")
+        # what content warnings apply to your story?
+        cw_wr = [
+            GENRE_CODE[cw] if cw in GENRE_CODE else cw for cw in response[columns['cw_wr']].split("& ")
         ]
-    )
 
-    # who would you like to be with?
-    match_pref = response[columns['match_request']]
+        # chapter links
+        chapters = [response[columns['wk_1']], 
+                    response[columns['wk_2']], 
+                    response[columns['wk_3']],
+                    response[columns['wk_4']]]
 
-    # who do you want to avoid?
-    match_veto = response[columns['match_veto']]
+        # what size group are you okay with?
+        size_pref = [SIZE_CODE[pref] for pref in response[columns['size_pref']].split(", ")]
 
-    # where you in groups last month? if so, stay with them?
-    try:
-        prev_month = GROUP_SORT_MODES[response[columns['prev_month']]]
-    except:
-        print(f"error 'prev_month' for user {name}")
+        # how many words can you commit to critiquing each week?
+        words_r = WORDCOUNT_CODE[response[columns['words_r']]]
 
-    # which group last month?
-    prev_group = response[columns['prev_group']].replace(" ","").lower()
+        # what genres will you be bringing to group?
+        genre_r = [
+            GENRE_CODE[genre] if genre in GENRE_CODE else genre
+            for genre in response[columns['genre_r']].split("& ")
+        ]
+
+        # which content warnings do you want to avoid?
+        cw_veto = (
+            []
+            if response[columns['cw_veto']] == "I'll read anything!"
+            else [
+                GENRE_CODE[cw] if cw in GENRE_CODE else cw
+                for cw in response[columns['cw_veto']].split("& ")
+            ]
+        )
+
+        # who would you like to be with?
+        match_pref = response[columns['match_request']]
+
+        # who do you want to avoid?
+        match_veto = response[columns['match_veto']]
+
+        # where you in groups last month? if so, stay with them?
+        try:
+            prev_month = GROUP_SORT_MODES[response[columns['prev_month']]]
+        except:
+            print(f"error 'prev_month' for user {name}")
+
+        # which group last month?
+        prev_group = response[columns['prev_group']].replace(" ","").lower()
 
 
-    # # do you want to be in a contest-focused group?
-    # contest = response[-1] == "Yes"k
+        # # do you want to be in a contest-focused group?
+        # contest = response[-1] == "Yes"k
 
-    # did you have problem members?
-    naughty_list.append((name, response[columns['naughty_list']]))
+        # did you have problem members?
+        naughty_list.append((name, response[columns['naughty_list']]))
 
-    user = Person(
-        name,
-        words_wr=words_wr,
-        genre_wr=genre_wr,
-        cw_wr=cw_wr,
-        size_pref=size_pref,
-        words_r=words_r,
-        genre_r=genre_r,
-        cw_veto=cw_veto,
-        match_pref=match_pref,
-        match_veto=match_veto,
-        prev_month=prev_month,
-        prev_group=prev_group
-        # seasonal=contest,
-    )
+        user = Person(
+            name,
+            words_wr=words_wr,
+            genre_wr=genre_wr,
+            cw_wr=cw_wr,
+            size_pref=size_pref,
+            words_r=words_r,
+            genre_r=genre_r,
+            cw_veto=cw_veto,
+            match_pref=match_pref,
+            match_veto=match_veto,
+            prev_month=prev_month,
+            prev_group=prev_group
+            # seasonal=contest,
+        )
 
-    users.append(user)
+        users.append(user)
 
-    if prev_group:
-        GROUPS[prev_group].append(user)
+        if prev_group:
+            GROUPS[prev_group].append(user)
 
-clean_team_reqs(users)
+    clean_team_reqs(users)
 
-m = Model(users=users.copy())
+    m = Model(users=users.copy())
 
-reqs = m.get_req_clusters()
-m.make_groups(premades=reqs)
+    reqs = m.get_req_clusters()
+    m.make_groups(premades=reqs)
 
-v = Visualizer(m)
-a = Auditor(m)
+    v = Visualizer(m)
+    a = Auditor(m)
 
-with open(f"groups-{datetime.now().strftime('%y-%m')}.txt", "w", encoding="utf-8") as f:
-    f.write(v.model_info() + "\n\n")
-    f.write(v.group_info( summary=False, 
-                            wc=True,
-                            cw=True,
-                            prev=True))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as f:
+        f.write(v.model_info() + "\n\n")
+        f.write(v.group_info( summary=False, 
+                                wc=True,
+                                cw=True,
+                                prev=True))
 
-    f.write(a.check_submissions())
-    f.write(a.check_groups())
+        f.write(a.check_submissions())
+        f.write(a.check_groups())
 
-    f.write("\nPROBLEM MEMBER REPORTS:\n")
-    f.write("\n".join(f'{name}: "{txt}"' for name, txt in naughty_list if txt))
-    f.write("----\n")
-    f.write(v.print_formatted_group_list())
+        f.write("\nPROBLEM MEMBER REPORTS:\n")
+        f.write("\n".join(f'{name}: "{txt}"' for name, txt in naughty_list if txt))
+        f.write("----\n")
+        f.write(v.print_formatted_group_list())
+
+    return output_path
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Parse a critique signup CSV into a grouping report")
+    parser.add_argument("input_path", nargs="?", default="source.csv", help="Path to the CSV file to parse")
+    parser.add_argument("-o", "--output", default=None, help="Where to write the generated text report")
+    args = parser.parse_args()
+    main(args.input_path, args.output)
 
 

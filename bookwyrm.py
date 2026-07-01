@@ -1,6 +1,12 @@
-import discord
 import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import discord
 from dotenv import load_dotenv
+
 from channel_manager import ChannelManager
 
 ALLOWED_GUILDS = [1274792500975894589, 687838172348284995]
@@ -44,5 +50,37 @@ async def build_group(ctx, name):
 
     result = "\n".join([f"**{obj[0]}**\nDiscussion: {obj[1]}\nSubmission: {obj[2]}" for obj in output])
     await ctx.followup.send(result)
+
+@bot.slash_command(guild_ids=ALLOWED_GUILDS)
+async def parse_signup_sheet(ctx, csv_file: discord.Attachment):
+    if not csv_file or not csv_file.filename.lower().endswith(".csv"):
+        await ctx.respond("Please upload the CSV file from the signup form.", ephemeral=True)
+        return
+
+    await ctx.defer()
+
+    with tempfile.TemporaryDirectory(prefix="bookwyrm-", dir=str(Path(__file__).resolve().parent)) as tmp_dir:
+        temp_path = Path(tmp_dir) / csv_file.filename
+        output_path = Path(tmp_dir) / "groups-report.txt"
+        await csv_file.save(temp_path)
+
+        completed = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve().parent / "parse-sheet.py"), str(temp_path), "-o", str(output_path)],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+        )
+
+        if completed.returncode != 0:
+            await ctx.followup.send(
+                f"Parsing failed.\n```\n{completed.stderr.strip() or completed.stdout.strip()}\n```"
+            )
+            return
+
+        if not output_path.exists():
+            await ctx.followup.send("Parsing completed, but no report file was produced.")
+            return
+
+        await ctx.followup.send(file=discord.File(output_path, filename=output_path.name))
 
 bot.run(os.getenv('TOKEN'))
