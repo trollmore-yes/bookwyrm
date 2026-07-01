@@ -1,10 +1,13 @@
 from resources import get_mascot, get_feedback_graphic, get_forum_header, get_sub_header
 from datetime import datetime
 
+default_discussion_forum = 1201013058412216370 
+default_submission_forum = 1201013167443157132
+
 class ChannelManager():
     def __init__(self):
-        self.discussion_forum = None
-        self.submission_forum = None
+        self.discussion_forum = default_discussion_forum
+        self.submission_forum = default_submission_forum
         self.guild_id = None
 
     def set_channels(self, disc, sub):

@@ -1019,7 +1019,9 @@ m.make_groups(premades=reqs)
 v = Visualizer(m)
 a = Auditor(m)
 
-with open(f"groups-{datetime.now().strftime('%y-%m')}.txt", "w", encoding="utf-8") as f:
+now = datetime.now()
+
+with open(f"groups-{now.strftime('%y-%m')}.txt", "w", encoding="utf-8") as f:
     f.write(v.model_info() + "\n\n")
     f.write(v.group_info( summary=False, 
                             wc=True,
