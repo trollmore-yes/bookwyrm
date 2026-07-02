@@ -1,8 +1,13 @@
 from resources import get_mascot, get_feedback_graphic, get_forum_header, get_sub_header
 from datetime import datetime
 
-default_discussion_forum = 1201013058412216370 
-default_submission_forum = 1201013167443157132
+# coteh values
+# default_discussion_forum = 1201013058412216370 
+# default_submission_forum = 1201013167443157132
+
+# test server values
+default_discussion_forum = 1335404321008779304
+default_submission_forum = 1335404176381050922
 
 class ChannelManager():
     def __init__(self):

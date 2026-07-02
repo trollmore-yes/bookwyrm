@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 from datetime import datetime
 from functools import reduce
 from pathlib import Path
@@ -120,6 +121,33 @@ def extend_str(input, length):
     spacer = " " * gap_len if gap_len > 0 else ""
     return input + spacer
 
+
+def parse_csv_timestamp(raw_timestamp: str) -> int:
+    """Convert CSV timestamp text to unix epoch seconds."""
+    value = (raw_timestamp or "").strip()
+    if not value:
+        raise ValueError("CSV timestamp is empty")
+
+    try:
+        return int(datetime.fromisoformat(value).timestamp())
+    except ValueError:
+        pass
+
+    timestamp_formats = [
+        "%m/%d/%Y %H:%M:%S",
+        "%m/%d/%Y %H:%M",
+        "%m/%d/%Y %I:%M:%S %p",
+        "%m/%d/%Y %I:%M %p",
+    ]
+
+    for fmt in timestamp_formats:
+        try:
+            return int(datetime.strptime(value, fmt).timestamp())
+        except ValueError:
+            continue
+
+    raise ValueError(f"Unrecognized CSV timestamp format: {value}")
+
 # initialize random seed based on current month and year
 seed_value = datetime.now().month + datetime.now().year
 seed(seed_value)
@@ -133,6 +161,7 @@ seed(seed_value)
 class Person:
     def __init__(self, name: str, **kwargs) -> None:
         self.name = name.replace(" ", "")
+        self.timestamp = kwargs["timestamp"]
         self.words_wr = kwargs["words_wr"]
         self.words_r = kwargs["words_r"]
         self.genre_wr = kwargs["genre_wr"]
@@ -903,11 +932,44 @@ def clean_team_reqs(users) -> None:
 
 
 
+def serialize_model(users, groups):
+    """Build a JSON-safe model payload for downstream workflows."""
+    group_timestamp = max((user.timestamp for user in users), default=0)
+    return {
+        "group_timestamp": group_timestamp,
+        "users": [
+            {
+                "timestamp": user.timestamp,
+                "name": user.name,
+                "words_wr": user.words_wr,
+                "words_r": user.words_r,
+                "genre_wr": user.genre_wr,
+                "genre_r": user.genre_r,
+                "cw_wr": user.cw_wr,
+                "cw_veto": user.cw_veto,
+                "size_pref": user.size_pref,
+                "match_pref": user.match_pref,
+                "match_veto": user.match_veto,
+                "prev_month": user.prev_month,
+                "prev_group": user.prev_group,
+            }
+            for user in users
+        ],
+        "groups": [
+            {
+                "name": group.name,
+                "members": [{"name": member.name} for member in group.members],
+            }
+            for group in groups
+        ],
+    }
+
+
 #######################################################
 #                   begin script                      #
 #######################################################
 
-def main(input_path="source.csv", output_path=None):
+def main(input_path="source.csv", output_path=None, model_output_path=None):
     users = []
 
     input_path = Path(input_path)
@@ -936,6 +998,7 @@ def main(input_path="source.csv", output_path=None):
             continue
 
         name = response[columns['name']]
+        timestamp = parse_csv_timestamp(response[columns['timestamp']])
 
         # how much output will you bring?
         words_wr = WORDCOUNT_CODE[response[columns['words_wr']]]
@@ -1000,6 +1063,7 @@ def main(input_path="source.csv", output_path=None):
 
         user = Person(
             name,
+            timestamp=timestamp,
             words_wr=words_wr,
             genre_wr=genre_wr,
             cw_wr=cw_wr,
@@ -1045,6 +1109,13 @@ def main(input_path="source.csv", output_path=None):
         f.write("----\n")
         f.write(v.print_formatted_group_list())
 
+    if model_output_path:
+        model_output_path = Path(model_output_path)
+        model_output_path.parent.mkdir(parents=True, exist_ok=True)
+        model_payload = serialize_model(users, m.groups)
+        with model_output_path.open("w", encoding="utf-8") as model_file:
+            json.dump(model_payload, model_file)
+
     return output_path
 
 
@@ -1052,7 +1123,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse a critique signup CSV into a grouping report")
     parser.add_argument("input_path", nargs="?", default="source.csv", help="Path to the CSV file to parse")
     parser.add_argument("-o", "--output", default=None, help="Where to write the generated text report")
+    parser.add_argument("--model-output", default=None, help="Where to write the generated model JSON")
     args = parser.parse_args()
-    main(args.input_path, args.output)
+    main(args.input_path, args.output, args.model_output)
 
 
