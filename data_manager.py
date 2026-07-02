@@ -131,9 +131,11 @@ class DataManager:
             if isinstance(group, dict):
                 mascot = group.get("name", "")
                 members = group.get("members", [])
+                thread_id = group.get("thread_id", 0)
             else:
                 mascot = getattr(group, "name", "")
                 members = getattr(group, "members", [])
+                thread_id = getattr(group, "thread_id", 0)
 
             member_names = []
             for member in members:
@@ -152,7 +154,7 @@ class DataManager:
                     timestamp,
                     guild_id,
                     mascot,
-                    0,
+                    int(thread_id),
                     json.dumps(member_names),
                 ),
             )
@@ -255,9 +257,11 @@ class TestDataManager:
         if isinstance(group, dict):
             mascot = group.get("name", "")
             members = group.get("members", [])
+            thread_id = group.get("thread_id", 0)
         else:
             mascot = getattr(group, "name", "")
             members = getattr(group, "members", [])
+            thread_id = getattr(group, "thread_id", 0)
 
         member_names = []
         for member in members:
@@ -268,7 +272,7 @@ class TestDataManager:
 
         return {
             "mascot": mascot,
-            "thread_id": 0,
+            "thread_id": int(thread_id),
             "member_ids": member_names,
         }
 

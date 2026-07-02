@@ -535,7 +535,7 @@ class Model:
                     idx = 0
                 else:
                     idx += 1
-            output.append(Group(list(curr), reqs=[p.name for p in curr]))
+            output.append(Group(members=list(curr), reqs=[p.name for p in curr]))
         return output
 
     def make_groups(self, sort="default", premades=None, fill_incomplete_premades=True) -> None:
@@ -700,13 +700,16 @@ class Model:
             - the group index where they went
             - the fit delta for placing them there
         """
-        deltas = [ g_idx for g_idx in range(self.group_count) if self.groups[g_idx].size < 4 ]
+        candidate_group_indices = [
+            g_idx for g_idx in range(self.group_count) if self.groups[g_idx].size < 4
+        ]
+        deltas = []
 
-        for g_idx in range(len(deltas)):
+        for g_idx in candidate_group_indices:
             base_fit = self.groups[g_idx].fit()
             new_fit = self.groups[g_idx].permute_with(person).fit()
             delta = new_fit - base_fit
-            deltas[g_idx] = (g_idx, delta)
+            deltas.append((g_idx, delta))
 
         deltas.sort(key=lambda x: x[1])
         g_idx, fit = deltas[0]
@@ -965,158 +968,170 @@ def serialize_model(users, groups):
     }
 
 
+class SignupManager:
+    def __init__(self) -> None:
+        self.users = []
+        self.naughty_list = []
+        self.model = None
+
+    def _reset_groups(self) -> None:
+        for group_name in GROUPS:
+            GROUPS[group_name] = []
+
+    def _parse_users_from_csv(self, input_path: Path) -> None:
+        self.users = []
+        self.naughty_list = []
+        self._reset_groups()
+
+        with input_path.open("r", encoding="utf-8") as f:
+            data = list(csv.reader(f))
+            header = [question.replace("\n", "") for question in data[0]]
+            input_rows = data[1:]
+
+        columns = {
+            QUESTION_CODES[question]: idx
+            for (idx, question) in zip(range(len(header)), header)
+        }
+
+        for response in input_rows:
+            quiz = response[columns["quiz"]]
+            if quiz == "TRUE":
+                continue
+
+            name = response[columns["name"]]
+            timestamp = parse_csv_timestamp(response[columns["timestamp"]])
+
+            words_wr = WORDCOUNT_CODE[response[columns["words_wr"]]]
+            genre_wr = response[columns["genre_wr"]].split("& ")
+
+            cw_wr = [
+                GENRE_CODE[cw] if cw in GENRE_CODE else cw
+                for cw in response[columns["cw_wr"]].split("& ")
+            ]
+
+            size_pref = [
+                SIZE_CODE[pref] for pref in response[columns["size_pref"]].split(", ")
+            ]
+            words_r = WORDCOUNT_CODE[response[columns["words_r"]]]
+
+            genre_r = [
+                GENRE_CODE[genre] if genre in GENRE_CODE else genre
+                for genre in response[columns["genre_r"]].split("& ")
+            ]
+
+            cw_veto = (
+                []
+                if response[columns["cw_veto"]] == "I'll read anything!"
+                else [
+                    GENRE_CODE[cw] if cw in GENRE_CODE else cw
+                    for cw in response[columns["cw_veto"]].split("& ")
+                ]
+            )
+
+            match_pref = response[columns["match_request"]]
+            match_veto = response[columns["match_veto"]]
+
+            try:
+                prev_month = GROUP_SORT_MODES[response[columns["prev_month"]]]
+            except Exception:
+                print(f"error 'prev_month' for user {name}")
+                prev_month = "no_group"
+
+            prev_group = response[columns["prev_group"]].replace(" ", "").lower()
+
+            self.naughty_list.append((name, response[columns["naughty_list"]]))
+
+            user = Person(
+                name,
+                timestamp=timestamp,
+                words_wr=words_wr,
+                genre_wr=genre_wr,
+                cw_wr=cw_wr,
+                size_pref=size_pref,
+                words_r=words_r,
+                genre_r=genre_r,
+                cw_veto=cw_veto,
+                match_pref=match_pref,
+                match_veto=match_veto,
+                prev_month=prev_month,
+                prev_group=prev_group,
+            )
+
+            self.users.append(user)
+
+            if prev_group:
+                GROUPS[prev_group].append(user)
+
+    def _build_model(self) -> None:
+        clean_team_reqs(self.users)
+
+        model = Model(users=self.users.copy())
+        reqs = model.get_req_clusters()
+        model.make_groups(premades=reqs)
+        self.model = model
+
+    def _build_report_text(self) -> str:
+        if self.model is None:
+            raise ValueError("No model has been built")
+
+        visualizer = Visualizer(self.model)
+        auditor = Auditor(self.model)
+
+        output = []
+        output.append(visualizer.model_info() + "\n\n")
+        output.append(
+            visualizer.group_info(
+                summary=False,
+                wc=True,
+                cw=True,
+                prev=True,
+            )
+        )
+        output.append(auditor.check_submissions())
+        output.append(auditor.check_groups())
+        output.append("\nPROBLEM MEMBER REPORTS:\n")
+        output.append("\n".join(f'{name}: "{txt}"' for name, txt in self.naughty_list if txt))
+        output.append("----\n")
+        output.append(visualizer.print_formatted_group_list())
+        return "".join(output)
+
+    def build_model_payload(self) -> dict:
+        if self.model is None:
+            raise ValueError("No model has been built")
+        return serialize_model(self.users, self.model.groups)
+
+    def process(self, input_path="source.csv", output_path=None, model_output_path=None):
+        input_path = Path(input_path)
+        if output_path is None:
+            output_path = Path(f"groups-{datetime.now().strftime('%y-%m')}.txt")
+        else:
+            output_path = Path(output_path)
+
+        self._parse_users_from_csv(input_path)
+        self._build_model()
+
+        report_text = self._build_report_text()
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(report_text, encoding="utf-8")
+
+        if model_output_path:
+            model_output_path = Path(model_output_path)
+            model_output_path.parent.mkdir(parents=True, exist_ok=True)
+            model_payload = self.build_model_payload()
+            with model_output_path.open("w", encoding="utf-8") as model_file:
+                json.dump(model_payload, model_file)
+
+        return output_path
+
+
 #######################################################
 #                   begin script                      #
 #######################################################
 
 def main(input_path="source.csv", output_path=None, model_output_path=None):
-    users = []
-
-    input_path = Path(input_path)
-    if output_path is None:
-        output_path = Path(f"groups-{datetime.now().strftime('%y-%m')}.txt")
-    else:
-        output_path = Path(output_path)
-
-    with input_path.open("r", encoding="utf-8") as f:
-        # input = "\r".join([line for line in file])
-        data = list(csv.reader(f))
-
-        header = [question.replace("\n","") for question in data[0]]
-        input = data[1:]
-
-
-    columns = { QUESTION_CODES[question]: idx 
-               for (idx, question) in zip(range(len(header)), header) }
-
-    naughty_list = []
-
-    for response in input:
-
-        quiz = response[columns['quiz']]
-        if quiz == "TRUE":
-            continue
-
-        name = response[columns['name']]
-        timestamp = parse_csv_timestamp(response[columns['timestamp']])
-
-        # how much output will you bring?
-        words_wr = WORDCOUNT_CODE[response[columns['words_wr']]]
-
-        # what genre do you write?
-        genre_wr = response[columns['genre_wr']].split("& ")
-
-        # what content warnings apply to your story?
-        cw_wr = [
-            GENRE_CODE[cw] if cw in GENRE_CODE else cw for cw in response[columns['cw_wr']].split("& ")
-        ]
-
-        # chapter links
-        chapters = [response[columns['wk_1']], 
-                    response[columns['wk_2']], 
-                    response[columns['wk_3']],
-                    response[columns['wk_4']]]
-
-        # what size group are you okay with?
-        size_pref = [SIZE_CODE[pref] for pref in response[columns['size_pref']].split(", ")]
-
-        # how many words can you commit to critiquing each week?
-        words_r = WORDCOUNT_CODE[response[columns['words_r']]]
-
-        # what genres will you be bringing to group?
-        genre_r = [
-            GENRE_CODE[genre] if genre in GENRE_CODE else genre
-            for genre in response[columns['genre_r']].split("& ")
-        ]
-
-        # which content warnings do you want to avoid?
-        cw_veto = (
-            []
-            if response[columns['cw_veto']] == "I'll read anything!"
-            else [
-                GENRE_CODE[cw] if cw in GENRE_CODE else cw
-                for cw in response[columns['cw_veto']].split("& ")
-            ]
-        )
-
-        # who would you like to be with?
-        match_pref = response[columns['match_request']]
-
-        # who do you want to avoid?
-        match_veto = response[columns['match_veto']]
-
-        # where you in groups last month? if so, stay with them?
-        try:
-            prev_month = GROUP_SORT_MODES[response[columns['prev_month']]]
-        except:
-            print(f"error 'prev_month' for user {name}")
-
-        # which group last month?
-        prev_group = response[columns['prev_group']].replace(" ","").lower()
-
-
-        # # do you want to be in a contest-focused group?
-        # contest = response[-1] == "Yes"k
-
-        # did you have problem members?
-        naughty_list.append((name, response[columns['naughty_list']]))
-
-        user = Person(
-            name,
-            timestamp=timestamp,
-            words_wr=words_wr,
-            genre_wr=genre_wr,
-            cw_wr=cw_wr,
-            size_pref=size_pref,
-            words_r=words_r,
-            genre_r=genre_r,
-            cw_veto=cw_veto,
-            match_pref=match_pref,
-            match_veto=match_veto,
-            prev_month=prev_month,
-            prev_group=prev_group
-            # seasonal=contest,
-        )
-
-        users.append(user)
-
-        if prev_group:
-            GROUPS[prev_group].append(user)
-
-    clean_team_reqs(users)
-
-    m = Model(users=users.copy())
-
-    reqs = m.get_req_clusters()
-    m.make_groups(premades=reqs)
-
-    v = Visualizer(m)
-    a = Auditor(m)
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as f:
-        f.write(v.model_info() + "\n\n")
-        f.write(v.group_info( summary=False, 
-                                wc=True,
-                                cw=True,
-                                prev=True))
-
-        f.write(a.check_submissions())
-        f.write(a.check_groups())
-
-        f.write("\nPROBLEM MEMBER REPORTS:\n")
-        f.write("\n".join(f'{name}: "{txt}"' for name, txt in naughty_list if txt))
-        f.write("----\n")
-        f.write(v.print_formatted_group_list())
-
-    if model_output_path:
-        model_output_path = Path(model_output_path)
-        model_output_path.parent.mkdir(parents=True, exist_ok=True)
-        model_payload = serialize_model(users, m.groups)
-        with model_output_path.open("w", encoding="utf-8") as model_file:
-            json.dump(model_payload, model_file)
-
-    return output_path
+    manager = SignupManager()
+    return manager.process(input_path=input_path, output_path=output_path, model_output_path=model_output_path)
 
 
 if __name__ == "__main__":
